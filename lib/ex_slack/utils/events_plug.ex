@@ -6,7 +6,7 @@ defmodule ExSlack.Utils.EventsPlug do
   @moduledoc """
   Implements URL verification for Slack
 
-  Based on docs: https://api.slack.com/events/url_verification
+  Based on docs: https://api.slack.com/authentication/verifying-requests-from-slack
 
   ## Usage
 
@@ -25,6 +25,8 @@ defmodule ExSlack.Utils.EventsPlug do
     * `:now` - DateTime to be used for verification, used only for tests
   """
 
+  @allowed_time_discrepency 60 * 5
+
   @impl true
   def init(options), do: Keyword.put_new(options, :request_path, "/__slack_url_verification")
 
@@ -36,47 +38,78 @@ defmodule ExSlack.Utils.EventsPlug do
         } = conn,
         opts
       ) do
-    if request_path == Keyword.get(opts, :request_path) do
-      slack_signing_secret = Keyword.get(opts, :slack_signing_secret)
-      request_body = conn.assigns.raw_body |> List.first()
+    with {:ok, _} <- is_valid_path?(request_path, opts),
+         timestamp <- get_timestamp(conn),
+         {:ok, _} <- is_replay_attack?(timestamp, opts),
+         {:ok, _} <- compare_signatures(conn, opts, timestamp) do
+      conn
+      |> resp(200, challenge)
+      |> halt()
+    else
+      {:skip, :invalid_path} ->
+        conn
 
-      timestamp_string =
-        Plug.Conn.get_req_header(conn, "x-slack-request-timestamp") |> List.first()
-
-      {timestamp, ""} = Integer.parse(timestamp_string)
-
-      now =
-        Keyword.get(opts, :now, DateTime.utc_now())
-        |> DateTime.to_unix()
-
-      if abs(now - timestamp) > 60 * 5 do
-        Logger.warn("[ExSlack] Potential replay attack")
-
+      {:skip, :replay_attack} ->
         conn
         |> resp(500, "")
-      else
-        slack_signature = Plug.Conn.get_req_header(conn, "x-slack-signature") |> List.first()
+        |> halt()
 
-        sig_basestring = "v0:" <> timestamp_string <> ":" <> request_body
+      {:error, :invalid_signature} ->
+        conn
+        |> resp(500, "")
+        |> halt()
 
-        my_signature =
-          "v0=" <>
-            (:crypto.mac(:hmac, :sha256, slack_signing_secret, sig_basestring)
-             |> Base.encode16()
-             |> String.downcase())
-
-        if Plug.Crypto.secure_compare(my_signature, slack_signature) do
-          conn
-          |> resp(200, challenge)
-          |> halt()
-        else
-          conn
-          |> resp(500, "")
-          |> halt()
-        end
-      end
-    else
-      conn
+      true ->
+        conn
     end
+  end
+
+  defp compare_signatures(conn, opts, timestamp) do
+    slack_signature = Plug.Conn.get_req_header(conn, "x-slack-signature") |> List.first()
+    request_body = conn.assigns.raw_body |> List.first()
+    sig_basestring = "v0:#{timestamp}:" <> request_body
+    slack_signing_secret = Keyword.fetch!(opts, :slack_signing_secret)
+
+    my_signature =
+      "v0=" <>
+        (:crypto.mac(:hmac, :sha256, slack_signing_secret, sig_basestring)
+         |> Base.encode16()
+         |> String.downcase())
+
+    if Plug.Crypto.secure_compare(my_signature, slack_signature) do
+      {:ok, :continue}
+    else
+      {:error, :invalid_signature}
+    end
+  end
+
+  defp is_replay_attack?(timestamp, opts) do
+    current_time = get_current_time(opts)
+
+    if abs(current_time - timestamp) < @allowed_time_discrepency do
+      {:ok, :continue}
+    else
+      {:skip, :replay_attack}
+    end
+  end
+
+  defp is_valid_path?(request_path, opts) do
+    if request_path == Keyword.fetch!(opts, :request_path) do
+      {:ok, :continue}
+    else
+      {:skip, :invalid_path}
+    end
+  end
+
+  defp get_timestamp(conn) do
+    timestamp_s = Plug.Conn.get_req_header(conn, "x-slack-request-timestamp") |> List.first()
+    {timestamp, ""} = Integer.parse(timestamp_s)
+
+    timestamp
+  end
+
+  defp get_current_time(opts) do
+    Keyword.get(opts, :now, DateTime.utc_now())
+    |> DateTime.to_unix()
   end
 end
