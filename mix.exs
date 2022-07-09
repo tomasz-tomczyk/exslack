@@ -1,11 +1,11 @@
 defmodule ExSlack.MixProject do
   use Mix.Project
 
-  @source_url "https://github.com/tomasz-tomczyk/ex_slack"
+  @source_url "https://github.com/tomasz-tomczyk/exslack"
 
   def project do
     [
-      app: :ex_slack,
+      app: :exslack,
       version: "0.1.0",
       elixir: "~> 1.13",
       start_permanent: Mix.env() == :prod,
