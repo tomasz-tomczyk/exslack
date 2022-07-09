@@ -1,0 +1,60 @@
+---
+name: Lint & Test
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    env:
+      ELIXIR_VERSION: 1.13.3
+      OTP_VERSION: 25.0.2
+      MIX_ENV: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Github repo
+        uses: actions/checkout@v3
+
+      - name: Setup BEAM Env
+        uses: erlef/setup-beam@v1.11.2
+        with:
+          otp-version: ${{ env.OTP_VERSION }}
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+
+      - name: Setup Cache
+        uses: actions/cache@v3
+        id: mix-cache
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ hashFiles('mix.lock') }}-${{ env.ELIXIR_VERSION }}-${{ env.OTP_VERSION }}
+
+      - if: steps.mix-cache.outputs.cache-hit != 'true'
+        name: Run mix deps.get
+        run: mix deps.get --only test
+
+      - if: steps.mix-cache.outputs.cache-hit != 'true'
+        name: Run mix deps.compile
+        run: mix deps.compile
+
+      - name: Run mix compile
+        run: mix compile --warnings-as-errors
+
+      - name: Run mix credo
+        run: mix credo
+
+      - name: Run mix test
+        run: mix test
+
+      - name: Run mix format
+        run: mix format --check-formatted
