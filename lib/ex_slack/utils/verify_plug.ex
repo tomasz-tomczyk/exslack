@@ -1,8 +1,4 @@
 defmodule ExSlack.Utils.VerifyPlug do
-  import Plug.Conn
-  require Logger
-  @behaviour Plug
-
   @moduledoc """
   Implements URL verification for Slack
 
@@ -38,6 +34,9 @@ defmodule ExSlack.Utils.VerifyPlug do
 
     * `:now` - DateTime to be used for verification, used only for tests
   """
+  import Plug.Conn
+  require Logger
+  @behaviour Plug
 
   @allowed_time_discrepency 60 * 5
 

@@ -16,7 +16,6 @@ defmodule ExSlack.Utils.CacheBodyReader do
 
   Ensure this is done before your app's router for it to be accessible to
   `ExSlack.Utils.VerifyPlug`
-
   """
 
   @doc """
