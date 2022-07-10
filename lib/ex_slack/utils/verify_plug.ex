@@ -1,4 +1,4 @@
-defmodule ExSlack.Utils.EventsPlug do
+defmodule ExSlack.Utils.VerifyPlug do
   import Plug.Conn
   require Logger
   @behaviour Plug
@@ -12,7 +12,7 @@ defmodule ExSlack.Utils.EventsPlug do
 
   Add it to your endpoint.ex as such:
 
-    plug ExSlack.EventsPlug,
+    plug ExSlack.VerifyPlug,
       slack_signing_secret: "6215a3d6eb3ccf9100d1bfaa8956364f"
 
   ## Options
