@@ -34,6 +34,7 @@ defmodule ExSlack.MixProject do
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:inch_ex, github: "rrrene/inch_ex", only: [:dev, :test]},
 
       # Docs
       {:ex_doc, "~> 0.27", only: :dev, runtime: false}
