@@ -28,9 +28,11 @@ defmodule ExSlack.Utils.EventsPlug do
   @allowed_time_discrepency 60 * 5
 
   @impl true
+  @spec init(keyword()) :: keyword()
   def init(options), do: Keyword.put_new(options, :request_path, "/__slack_url_verification")
 
   @impl true
+  @spec call(Plug.Conn.t(), keyword()) :: Plug.Conn.t()
   def call(
         %{
           request_path: request_path,
@@ -38,10 +40,10 @@ defmodule ExSlack.Utils.EventsPlug do
         } = conn,
         opts
       ) do
-    with {:ok, _} <- is_valid_path?(request_path, opts),
-         timestamp <- get_timestamp(conn),
-         {:ok, _} <- is_replay_attack?(timestamp, opts),
-         {:ok, _} <- compare_signatures(conn, opts, timestamp) do
+    with {:ok, timestamp} <- get_timestamp(conn),
+         {:ok, _continue} <- is_valid_path?(request_path, opts),
+         {:ok, _continue} <- is_replay_attack?(timestamp, opts),
+         {:ok, _continue} <- is_valid_signature?(conn, opts, timestamp) do
       conn
       |> resp(200, challenge)
       |> halt()
@@ -49,25 +51,17 @@ defmodule ExSlack.Utils.EventsPlug do
       {:skip, :invalid_path} ->
         conn
 
-      {:skip, :replay_attack} ->
+      _errors ->
         conn
         |> resp(500, "")
         |> halt()
-
-      {:error, :invalid_signature} ->
-        conn
-        |> resp(500, "")
-        |> halt()
-
-      true ->
-        conn
     end
   end
 
-  defp compare_signatures(conn, opts, timestamp) do
+  defp is_valid_signature?(conn, opts, timestamp) do
     slack_signature = Plug.Conn.get_req_header(conn, "x-slack-signature") |> List.first()
-    request_body = conn.assigns.raw_body |> List.first()
-    sig_basestring = "v0:#{timestamp}:" <> request_body
+    raw_body = conn.assigns.raw_body |> List.first()
+    sig_basestring = "v0:#{timestamp}:" <> raw_body
     slack_signing_secret = Keyword.fetch!(opts, :slack_signing_secret)
 
     my_signature =
@@ -84,12 +78,15 @@ defmodule ExSlack.Utils.EventsPlug do
   end
 
   defp is_replay_attack?(timestamp, opts) do
-    current_time = get_current_time(opts)
+    current_time =
+      opts
+      |> Keyword.get(:now, DateTime.utc_now())
+      |> DateTime.to_unix()
 
     if abs(current_time - timestamp) < @allowed_time_discrepency do
       {:ok, :continue}
     else
-      {:skip, :replay_attack}
+      {:error, :replay_attack}
     end
   end
 
@@ -102,14 +99,13 @@ defmodule ExSlack.Utils.EventsPlug do
   end
 
   defp get_timestamp(conn) do
-    timestamp_s = Plug.Conn.get_req_header(conn, "x-slack-request-timestamp") |> List.first()
-    {timestamp, ""} = Integer.parse(timestamp_s)
-
-    timestamp
-  end
-
-  defp get_current_time(opts) do
-    Keyword.get(opts, :now, DateTime.utc_now())
-    |> DateTime.to_unix()
+    conn
+    |> Plug.Conn.get_req_header("x-slack-request-timestamp")
+    |> List.first()
+    |> Integer.parse()
+    |> case do
+      {timestamp, ""} -> {:ok, timestamp}
+      :error -> {:error, :invalid_timestamp}
+    end
   end
 end

@@ -10,7 +10,7 @@ defmodule ExSlack.Utils.EventsPlugTest do
 
   setup do
     conn =
-      :get
+      :post
       |> conn("/__slack_url_verification", %{
         "challenge" => "PzW6yEqcajalgLQ4TiLrv28MnMa4QFWR5kJKsH9rCkrwlkpeKFE4",
         "token" => "YMyckcTNASDyJ6xUnXmaDJlU",
@@ -36,7 +36,7 @@ defmodule ExSlack.Utils.EventsPlugTest do
       )
 
     conn = conn |> EventsPlug.call(options)
-    assert {:ok, "", %{status: 200, resp_body: resp_body} = _conn} = read_body(conn)
+    assert {:ok, _resp_text, %{status: 200, resp_body: resp_body} = _conn} = read_body(conn)
     assert resp_body == "PzW6yEqcajalgLQ4TiLrv28MnMa4QFWR5kJKsH9rCkrwlkpeKFE4"
   end
 
@@ -48,7 +48,7 @@ defmodule ExSlack.Utils.EventsPlugTest do
       )
 
     conn = conn |> EventsPlug.call(options)
-    assert {:ok, "", %{status: 500, resp_body: ""} = _conn} = read_body(conn)
+    assert {:ok, _resp_text, %{status: 500, resp_body: ""} = _conn} = read_body(conn)
   end
 
   test "returns 500 when signatures don't match as a result of invalid secret", %{conn: conn} do
@@ -59,7 +59,7 @@ defmodule ExSlack.Utils.EventsPlugTest do
       )
 
     conn = conn |> EventsPlug.call(options)
-    assert {:ok, "", %{status: 500, resp_body: ""} = _conn} = read_body(conn)
+    assert {:ok, _resp_text, %{status: 500, resp_body: ""} = _conn} = read_body(conn)
   end
 
   test "returns conn when the url doesn't match", %{conn: conn} do
@@ -71,7 +71,7 @@ defmodule ExSlack.Utils.EventsPlugTest do
       )
 
     conn = conn |> EventsPlug.call(options)
-    assert {:ok, "", %{status: nil, resp_body: nil} = _conn} = read_body(conn)
+    assert {:ok, _resp_text, %{status: nil, resp_body: nil} = _conn} = read_body(conn)
   end
 
   test "returns error when slack signing secret isn't present", %{conn: conn} do
@@ -80,5 +80,20 @@ defmodule ExSlack.Utils.EventsPlugTest do
     assert_raise KeyError, fn ->
       conn |> EventsPlug.call(options)
     end
+  end
+
+  test "returns error when provided timestamp isn't valid", %{conn: conn} do
+    options =
+      EventsPlug.init(
+        slack_signing_secret: @slack_signing_secret,
+        now: ~U[2022-07-09 14:46:24.390519Z]
+      )
+
+    conn =
+      conn
+      |> put_req_header("x-slack-request-timestamp", "")
+      |> EventsPlug.call(options)
+
+    assert {:ok, _resp_text, %{status: 500, resp_body: ""} = _conn} = read_body(conn)
   end
 end
