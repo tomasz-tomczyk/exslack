@@ -30,6 +30,7 @@ defmodule ExSlack.MixProject do
     [
       {:plug_cowboy, "~> 2.0"},
       {:tesla, "~> 1.4"},
+      {:jason, "~> 1.3"},
 
       # Runtime dependencies for tests / linting
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
