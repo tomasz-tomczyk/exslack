@@ -29,6 +29,7 @@ defmodule ExSlack.MixProject do
   defp deps do
     [
       {:plug_cowboy, "~> 2.0"},
+      {:tesla, "~> 1.4"},
 
       # Runtime dependencies for tests / linting
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
