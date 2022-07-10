@@ -8,6 +8,9 @@ defmodule ExSlack.Utils.VerifyPlug do
 
   Based on docs: https://api.slack.com/authentication/verifying-requests-from-slack
 
+  Assumes request's raw body to be present in `conn.assigns.raw_body` - see
+  `ExSlack.Utils.RawBody` for a parser that will cache it.
+
   ## Usage
 
   Create a pipeline using the plug in your router:
