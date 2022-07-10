@@ -10,17 +10,28 @@ defmodule ExSlack.Utils.VerifyPlug do
 
   ## Usage
 
-  Add it to your endpoint.ex as such:
+  Create a pipeline using the plug in your router:
 
-    plug ExSlack.VerifyPlug,
-      slack_signing_secret: "6215a3d6eb3ccf9100d1bfaa8956364f"
+    pipeline :slack do
+      plug ExSlack.Utils.VerifyPlug,
+        slack_signing_secret: "6215a3d6eb3ccf9100d1bfaa8956364f"
+    end
+
+  Create a scope that uses the pipeline:
+
+    scope "/bot", MyAppWeb do
+      pipe_through :slack
+
+      post "/event", EventController, :parse
+    end
+
+  You can use any route piped through this pipeline as the destination for your
+  events from Slack. When provided a "challenge" param from Slack, it will
+  respond with the value assuming the other verification passes.
 
   ## Options
 
     * `:slack_signing_secret` - obtained from Slack
-
-    * `:request_path` - URL to be used for verification. Defaults to
-      `/__slack_url_verification`
 
     * `:now` - DateTime to be used for verification, used only for tests
   """
@@ -29,31 +40,25 @@ defmodule ExSlack.Utils.VerifyPlug do
 
   @impl true
   @spec init(keyword()) :: keyword()
-  def init(options), do: Keyword.put_new(options, :request_path, "/__slack_url_verification")
+  def init(options), do: options
 
   @impl true
   @spec call(Plug.Conn.t(), keyword()) :: Plug.Conn.t()
-  def call(
-        %{
-          request_path: request_path,
-          params: %{"challenge" => challenge, "token" => _token, "type" => "url_verification"}
-        } = conn,
-        opts
-      ) do
+  def call(conn, opts) do
     with {:ok, timestamp} <- get_timestamp(conn),
-         {:ok, _continue} <- is_valid_path?(request_path, opts),
          {:ok, _continue} <- is_replay_attack?(timestamp, opts),
          {:ok, _continue} <- is_valid_signature?(conn, opts, timestamp) do
-      conn
-      |> resp(200, challenge)
-      |> halt()
-    else
-      {:skip, :invalid_path} ->
+      if Map.get(conn.params, "type") == "url_verification" do
         conn
-
+        |> send_resp(200, Map.get(conn.params, "challenge"))
+        |> halt()
+      else
+        conn
+      end
+    else
       _errors ->
         conn
-        |> resp(500, "")
+        |> send_resp(500, "")
         |> halt()
     end
   end
@@ -87,14 +92,6 @@ defmodule ExSlack.Utils.VerifyPlug do
       {:ok, :continue}
     else
       {:error, :replay_attack}
-    end
-  end
-
-  defp is_valid_path?(request_path, opts) do
-    if request_path == Keyword.fetch!(opts, :request_path) do
-      {:ok, :continue}
-    else
-      {:skip, :invalid_path}
     end
   end
 

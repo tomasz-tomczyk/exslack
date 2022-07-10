@@ -62,12 +62,25 @@ defmodule ExSlack.Utils.VerifyPlugTest do
     assert {:ok, _resp_text, %{status: 500, resp_body: ""} = _conn} = read_body(conn)
   end
 
-  test "returns conn when the url doesn't match", %{conn: conn} do
+  test "returns conn when there's no challenge but other values are correct" do
+    conn =
+      :post
+      |> conn("/event", %{
+        "token" => "YMyckcTNASDyJ6xUnXmaDJlU"
+      })
+      |> put_req_header("x-slack-request-timestamp", "1657377984")
+      |> put_req_header(
+        "x-slack-signature",
+        "v0=8bcf11adb4458c4bd341d33bbe34514b3c5e3cf5da86503033ae4b2cdc53db85"
+      )
+      |> assign(:raw_body, [
+        "{\"token\":\"YMyckcTNASDyJ6xUnXmaDJlU\",\"challenge\":\"PzW6yEqcajalgLQ4TiLrv28MnMa4QFWR5kJKsH9rCkrwlkpeKFE4\",\"type\":\"url_verification\"}"
+      ])
+
     options =
       VerifyPlug.init(
         slack_signing_secret: @slack_signing_secret,
-        now: ~U[2022-07-09 14:46:24.390519Z],
-        request_path: "/slack-url-verification"
+        now: ~U[2022-07-09 14:46:24.390519Z]
       )
 
     conn = conn |> VerifyPlug.call(options)
