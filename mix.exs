@@ -33,6 +33,7 @@ defmodule ExSlack.MixProject do
       # Runtime dependencies for tests / linting
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
 
       # Docs
       {:ex_doc, "~> 0.27", only: :dev, runtime: false}

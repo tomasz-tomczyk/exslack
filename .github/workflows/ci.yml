@@ -17,7 +17,7 @@ jobs:
   lint-and-test:
     env:
       ELIXIR_VERSION: 1.13.3
-      OTP_VERSION: 25.0.2
+      OTP_VERSION: 24.2
       MIX_ENV: test
     runs-on: ubuntu-latest
     steps:
@@ -37,6 +37,7 @@ jobs:
           path: |
             deps
             _build
+            priv/plts
           key: ${{ hashFiles('mix.lock') }}-${{ env.ELIXIR_VERSION }}-${{ env.OTP_VERSION }}
 
       - if: steps.mix-cache.outputs.cache-hit != 'true'
@@ -47,11 +48,18 @@ jobs:
         name: Run mix deps.compile
         run: mix deps.compile
 
+      - name: Create PLTs
+        if: steps.mix-cache.outputs.cache-hit != 'true'
+        run: mix dialyzer --plt
+
       - name: Run mix compile
         run: mix compile --warnings-as-errors
 
       - name: Run mix credo
         run: mix credo
+
+      - name: Run mix dialyzer
+        run: mix dialyzer
 
       - name: Run mix test
         run: mix test
