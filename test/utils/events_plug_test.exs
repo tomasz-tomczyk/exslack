@@ -4,6 +4,10 @@ defmodule ExSlack.Utils.EventsPlugTest do
   import Plug.Conn
   alias ExSlack.Utils.EventsPlug
 
+  # Wasn't too sure how to mock all of these values, so this was a real request.
+  # Regenerated the secret since then.
+  @slack_signing_secret "6215a3d6eb3ccf9100d1bfaa8956364f"
+
   setup do
     conn =
       :get
@@ -27,7 +31,7 @@ defmodule ExSlack.Utils.EventsPlugTest do
   test "returns valid challenge value when provided the correct secret", %{conn: conn} do
     options =
       EventsPlug.init(
-        slack_signing_secret: "6215a3d6eb3ccf9100d1bfaa8956364f",
+        slack_signing_secret: @slack_signing_secret,
         now: ~U[2022-07-09 14:46:24.390519Z]
       )
 
@@ -39,7 +43,7 @@ defmodule ExSlack.Utils.EventsPlugTest do
   test "returns 500 when suspecting of replay attack", %{conn: conn} do
     options =
       EventsPlug.init(
-        slack_signing_secret: "6215a3d6eb3ccf9100d1bfaa8956364f",
+        slack_signing_secret: @slack_signing_secret,
         now: ~U[2022-08-09 14:46:24.390519Z]
       )
 
@@ -61,7 +65,7 @@ defmodule ExSlack.Utils.EventsPlugTest do
   test "returns conn when the url doesn't match", %{conn: conn} do
     options =
       EventsPlug.init(
-        slack_signing_secret: "6215a3d6eb3ccf9100d1bfaa8956364f",
+        slack_signing_secret: @slack_signing_secret,
         now: ~U[2022-07-09 14:46:24.390519Z],
         request_path: "/slack-url-verification"
       )
